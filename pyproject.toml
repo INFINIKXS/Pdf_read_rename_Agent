@@ -1,0 +1,17 @@
+[project]
+name = "document-intelligence-agent"
+version = "0.1.0"
+description = "Automation tool for document workflows using regex and LLM."
+authors = ["Ifeanyi Obasi <owner@example.com>"]
+requires-python = ">=3.9"
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "D", "C90", "PT"]
+ignore = []
+exclude = [".venv", "build", "dist", ".taskmaster", ".github"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
