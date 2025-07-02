@@ -20,6 +20,7 @@ node_modules/
 Agent_Building_Guidlines
 AGENTS.md
 .env.example
+copilot-instructions.md
 
 # Editor directories and files
 .idea
