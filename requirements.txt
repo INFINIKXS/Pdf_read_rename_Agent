@@ -1,5 +1,9 @@
+
 click
 PyPDF2
 python-docx
 openai
 langchain
+google-generativeai
+promptl-ai
+python-dotenv
