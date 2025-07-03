@@ -1,3 +1,4 @@
+**/__pycache__/
 # Logs
 logs
 *.log
@@ -31,7 +32,10 @@ copilot-instructions.md
 *.sln
 *.sw?
 .github
-
+.venv
 
 # OS specific
 .DS_Store
+pdfs
+Chosen
+Renamed

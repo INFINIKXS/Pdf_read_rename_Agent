@@ -67,8 +67,11 @@ def resolve_collision(directory: str, filename: str) -> str:
         counter += 1
     return candidate
 
+import shutil
+
 def rename_mode(
-    target_dir: str = '.',
+    target_dir: Optional[str] = None,
+    dest_dir: Optional[str] = None,
     exts: Optional[List[str]] = None,
     dry_run: bool = False,
     llm_client: Optional[LLMClient] = None,
@@ -89,6 +92,20 @@ def rename_mode(
     Returns:
         List[tuple]: List of (old_path, new_path) tuples for renamed files.
     """
+    if target_dir is None:
+        target_dir = input("Enter the source folder to scan for files: ").strip()
+        if not target_dir:
+            if verbose:
+                print("No source folder provided. Aborting.")
+            return []
+    if dest_dir is None:
+        dest_dir = input("Enter the destination folder to copy and rename files: ").strip()
+        if not dest_dir:
+            if verbose:
+                print("No destination folder provided. Aborting.")
+            return []
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
     if exts is None:
         exts = list(HANDLER_MAP.keys())
     files = scan_files(target_dir, exts)
@@ -99,43 +116,70 @@ def rename_mode(
     if llm_client is None:
         llm_client = LLMClient()
     results = []
+    error_files = []
     for file_path in files:
         ext = os.path.splitext(file_path)[1].lower()
         handler_cls = HANDLER_MAP.get(ext)
+        error_occurred = False
+        retry_attempted = False
         if not handler_cls:
             if verbose:
                 print(f"No handler for {file_path}")
-            continue
-        handler = handler_cls()
-        try:
-            text = handler.extract_text(file_path)
-        except Exception as e:
+            error_occurred = True
+        else:
+            handler = handler_cls()
+            # Extraction and LLM retry logic
+            for attempt in range(2):
+                try:
+                    text = handler.extract_text(file_path)
+                except Exception as e:
+                    if verbose:
+                        print(f"Failed to extract text from {file_path} (attempt {attempt+1}): {e}")
+                    text = ""
+                    error_occurred = True
+                # Chunk if needed
+                chunks = llm_client.chunk_text(text, max_tokens=chunk_size, overlap=chunk_overlap) if text else ['']
+                chunk_for_prompt = chunks[0] if chunks else ''
+                prompt = llm_client.render_named_prompt('rename', {'text': chunk_for_prompt})
+                try:
+                    new_name = llm_client.generate_content(prompt).strip()
+                    error_occurred = False
+                except Exception as e:
+                    if verbose:
+                        print(f"LLM failed for {file_path} (attempt {attempt+1}): {e}")
+                    new_name = os.path.basename(file_path)
+                    error_occurred = True
+                if not error_occurred or attempt == 1:
+                    break
+                retry_attempted = True
+            new_name = sanitize_filename(new_name, ext)
+            new_name = resolve_collision(dest_dir, new_name)
+            new_path = os.path.join(dest_dir, new_name)
+            if not dry_run:
+                try:
+                    shutil.copy2(file_path, new_path)
+                except Exception as e:
+                    if verbose:
+                        print(f"Copy failed {file_path} -> {new_path}: {e}")
+                    error_occurred = True
             if verbose:
-                print(f"Failed to extract text from {file_path}: {e}")
-            continue
-        # Chunk if needed
-        chunks = llm_client.chunk_text(text, max_tokens=chunk_size, overlap=chunk_overlap)
-        # Use first chunk for naming (or join if short)
-        chunk_for_prompt = chunks[0] if chunks else ''
-        prompt = llm_client.render_named_prompt('rename', {'text': chunk_for_prompt})
-        try:
-            new_name = llm_client.generate_content(prompt).strip()
-        except Exception as e:
-            if verbose:
-                print(f"LLM failed for {file_path}: {e}")
-            continue
-        new_name = sanitize_filename(new_name, ext)
-        dir_ = os.path.dirname(file_path)
-        new_name = resolve_collision(dir_, new_name)
-        new_path = os.path.join(dir_, new_name)
-        if not dry_run:
+                print(f"{file_path} -> {new_path}")
+            results.append((file_path, new_path))
+        if error_occurred:
+            error_files.append(file_path)
+    # Copy error files to Error folder
+    if error_files:
+        error_dir = os.path.join(dest_dir, 'Error')
+        if not os.path.exists(error_dir):
+            os.makedirs(error_dir)
+        for src in error_files:
+            fname = os.path.basename(src)
+            dest = os.path.join(error_dir, fname)
             try:
-                os.rename(file_path, new_path)
+                shutil.copy2(src, dest)
+                if verbose:
+                    print(f"Copied error file: {src} -> {dest}")
             except Exception as e:
                 if verbose:
-                    print(f"Rename failed {file_path} -> {new_path}: {e}")
-                continue
-        if verbose:
-            print(f"{file_path} -> {new_path}")
-        results.append((file_path, new_path))
+                    print(f"Failed to copy error file {src} -> {dest}: {e}")
     return results

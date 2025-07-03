@@ -5,12 +5,14 @@ import pytest
 from unittest.mock import MagicMock
 from src.agent_core import rename_workflow
 
-class DummyLLM:
+from src.services.llm_client import LLMClient
+
+class DummyLLM(LLMClient):
     def chunk_text(self, text, max_tokens=1000, overlap=100):
         return [text]
-    def render_named_prompt(self, name, params):
-        return f"Prompt: {params['text']}"
-    def generate_content(self, prompt):
+    def render_named_prompt(self, name, parameters):
+        return f"Prompt: {parameters['text']}"
+    def generate_content(self, prompt, model=None, max_tokens=None, **kwargs):
         return "Renamed_Document"
 
 def test_rename_mode(monkeypatch):
