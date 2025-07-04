@@ -122,6 +122,7 @@ def rename_mode(
         handler_cls = HANDLER_MAP.get(ext)
         error_occurred = False
         retry_attempted = False
+        new_name = os.path.basename(file_path)  # Ensure new_name is always defined
         if not handler_cls:
             if verbose:
                 print(f"No handler for {file_path}")
@@ -152,19 +153,19 @@ def rename_mode(
                 if not error_occurred or attempt == 1:
                     break
                 retry_attempted = True
-            new_name = sanitize_filename(new_name, ext)
-            new_name = resolve_collision(dest_dir, new_name)
-            new_path = os.path.join(dest_dir, new_name)
-            if not dry_run:
-                try:
-                    shutil.copy2(file_path, new_path)
-                except Exception as e:
-                    if verbose:
-                        print(f"Copy failed {file_path} -> {new_path}: {e}")
-                    error_occurred = True
-            if verbose:
-                print(f"{file_path} -> {new_path}")
-            results.append((file_path, new_path))
+        new_name = sanitize_filename(new_name, ext)
+        new_name = resolve_collision(dest_dir, new_name)
+        new_path = os.path.join(dest_dir, new_name)
+        if not dry_run:
+            try:
+                shutil.copy2(file_path, new_path)
+            except Exception as e:
+                if verbose:
+                    print(f"Copy failed {file_path} -> {new_path}: {e}")
+                error_occurred = True
+        if verbose:
+            print(f"{file_path} -> {new_path}")
+        results.append((file_path, new_path))
         if error_occurred:
             error_files.append(file_path)
     # Copy error files to Error folder
