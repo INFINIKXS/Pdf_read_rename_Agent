@@ -10,3 +10,8 @@ pytest
 fpdf
 exa-py
 pypdf
+selenium>=4.0.0
+webdriver-manager>=3.8.0
+mcp
+mcp pydantic-ai
+google-adk
